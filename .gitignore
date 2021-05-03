@@ -5,4 +5,4 @@ dist/
 downloads/
 
 *.dk
-.vscode/settings.json
+.vscode/
