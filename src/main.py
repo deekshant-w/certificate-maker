@@ -16,6 +16,7 @@ from docxtpl import DocxTemplate
 
 # word to pdf
 import win32com.client
+from pathlib import Path
 
 # create and send email
 from email.mime.multipart import MIMEMultipart
@@ -23,7 +24,7 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 import smtplib
-import base64
+import re
 
 # date and time handling
 import datetime
@@ -52,6 +53,19 @@ def makeNewName(size=6):
         + str(int(time()) % (10 ** size))
     )
     return res
+
+
+def createCredsFile(location):
+    """
+    Create credentials file if doesnot exists
+    """
+    if os.path.isfile(location):
+        return
+
+    credText = "email - \npassword- "
+    file = open(location, "w")
+    file.write(credText)
+    file.close()
 
 
 def create_project(controller, filename):
@@ -196,7 +210,7 @@ def createDB():
     data = list(
         DocxTemplate(fnf["projectTemplate"]).get_undeclared_template_variables()
     )
-    data = ["EMAIL_ID", "CERTIFICATE_CREATED", "MAIL_SEENT"] + data
+    data = ["EMAIL_ID", "CERTIFICATE_CREATED", "MAIL_SENT"] + data
 
     # creating workbook with "data" columns
     wb = oxl.Workbook()
@@ -257,8 +271,8 @@ def createData(data):
     return cleanData
 
 
+# maximum number of retries before pdf conversion fails
 MAX_RETRIES = 3
-from pathlib import Path
 
 
 def makeCerti(filename, retry=MAX_RETRIES):
@@ -457,92 +471,170 @@ def createSettingsFile(l, template=None):
 
 
 def createAndSend(send_from, send_to, certiFile, message, smtp, subject):
-    msg = MIMEMultipart()
-    msg["From"] = send_from
-    msg["Subject"] = subject
-    msg["To"] = send_to
-    msg.attach(MIMEText(message))
-    part = MIMEBase("application", "octet-stream")
-    with open(certiFile, "rb") as file:
-        part.set_payload(file.read())
-    encoders.encode_base64(part)
-    part.add_header("Content-Disposition", 'attachment; filename="Offer Letter.pdf"')
-    msg.attach(part)
-    # use async or multithreading
-    smtp.sendmail(send_from, send_to, msg.as_string())
+    """
+    Create email, Attatch pdf file and send email
+    Arguments:
+        send_from   - our email
+        send_to     - recienver email
+        certiFile   - location of pdf file
+        message     - message body
+        smtp        - smtp object to send email (preset)
+        subject     - email subject
+
+    Returns:
+        success     - 1
+        failure     - 0
+    """
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = send_from
+        msg["Subject"] = subject
+        msg["To"] = send_to
+        msg.attach(MIMEText(message))
+        part = MIMEBase("application", "octet-stream")
+        with open(certiFile, "rb") as file:
+            part.set_payload(file.read())
+        encoders.encode_base64(part)
+        part.add_header(
+            "Content-Disposition", 'attachment; filename="Offer Letter.pdf"'
+        )
+        msg.attach(part)
+        # use async or multithreading
+        smtp.sendmail(send_from, send_to, msg.as_string())
+        return 1
+    except Exception as e:
+        print(e)
+        return 0
 
 
 def email(thisButton, controller):
-    wb = oxl.load_workbook(fnf["projectDatabase"])
-    ws = wb.active
-    data = getData(ws)
+    """
+    Create, send an record emails
+    * Using SMTP
+    """
+    thisButton.configure(background="SystemButtonFace")
+    thisButton.configure(text="Email Certificates")
+
     if not os.path.exists(fnf["projectCertificates"]):
         messagebox.showinfo(
             "No Data", "Please create the certificates first in order to Email them."
         )
         return
-    if "EMAIL_ID" in data[0]:
-        thisButton.configure(background="SystemButtonFace")
-        thisButton.configure(text="Email Certificates")
-        pdfs = [
-            f
-            for f in os.listdir(fnf["projectCertificates"])
-            if f.split(".")[-1] == "pdf"
-        ]
-        if not len(pdfs):
-            messagebox.showinfo(
-                "No Data",
-                "Please create the certificates first in order to Email them.",
-            )
-            return
-        emailIndex = data[0].index("EMAIL_ID")
-        ids = []
-        for x in range(1, len(data)):
-            ids.append(data[x][emailIndex])
-        counter = 1
-        thisButton.configure(text="Please Wait ..")
-        eob.configure(text="8 sec")
-        controller.update()
-        if not os.path.exists(fnf["projectSettings"]):
-            createSettingsFile(fnf["projectSettings"])
-        settings = json.loads(open(fnf["projectSettings"]).read())
-        baseSettings = json.loads(
-            (
-                base64.b64decode(
-                    base64.b64decode(
-                        base64.b64decode(
-                            base64.b64decode(
-                                base64.b64decode(open(fnf["baseSettings"], "rb").read())
-                            )
-                        )
-                    )
-                )
-            )
-            .decode("utf8")
-            .replace("'", '"')
+
+    # Email credentials
+    createCredsFile(fnf["mailCreds"])
+    credFile = open(fnf["mailCreds"]).read().strip().split("\n")
+
+    # sender email
+    email = credFile[0]
+    email = re.findall(r"^[E,e]?[M,m]?[A,a]?[I,i]?[L,l]? *[-,:]* *(.*) *", email)[
+        0
+    ].strip()
+
+    # sender password
+    pas = credFile[1]
+    pas = re.findall(
+        r"^[P,p]?[A,a]?[S,s]?[S,s]?[W,w]?[O,o]?[R,r]?[D,d]? *[-,:]* *(.*) *", pas
+    )[0].strip()
+
+    if not (email and pas):
+        messagebox.showinfo("No Credentials Found!", "Please fill the creds.txt file")
+        return
+
+    # search if any pdf exists
+    pdfs = [
+        f for f in os.listdir(fnf["projectCertificates"]) if f.split(".")[-1] == "pdf"
+    ]
+    if not len(pdfs):
+        messagebox.showinfo(
+            "No Data", "Please create the certificates first in order to Email them.",
         )
-        send_from = baseSettings["emailFrom"]
-        subject = settings["emailSubject"]
-        message = settings["emailBody"]
-        inputData = baseSettings["inputData"]
-        smtp = smtplib.SMTP(host="smtp.gmail.com", port=587)
-        smtp.starttls()
-        smtp.login(send_from, inputData)
-        for x in range(len(ids)):
-            pdfLocation = fnf["projectCertificates"] + "/" + pdfs[x]
-            createAndSend(send_from, ids[x], pdfLocation, message, smtp, subject)
-            eob.configure(text=f"{counter}/{len(ids)}")
-            controller.update()
-            counter += 1
-        smtp.quit()
-        thisButton.configure(text="Email Certificates")
-        thisButton.configure(bg="#00ff11")
-        eob.configure(text=f"{counter-1}/{len(ids)}")
-        eob.configure(text=f"Done({len(ids)})!")
-    else:
+        return
+
+    # load project database
+    wb = oxl.load_workbook(fnf["projectDatabase"])
+    ws = wb.active
+    data = getData(ws)
+
+    # check if email sending field is in database
+    if not "EMAIL_ID" in data[0]:
         messagebox.showinfo(
             "No Emails Found!", "PLease fill the EMAIL_ID field in the database."
         )
+        return
+
+    # get data for sending email
+    data = createData(data)
+
+    # disable email button
+    thisButton.configure(text="Please Wait ..")
+    thisButton.configure(state="disable")
+    controller.update()
+
+    if not os.path.exists(fnf["projectSettings"]):
+        createSettingsFile(fnf["projectSettings"])
+
+    # project settings
+    settings = json.loads(open(fnf["projectSettings"]).read())
+
+    # email info
+    subject = settings["emailSubject"]
+    message = settings["emailBody"]
+
+    # setting SMTP server
+    smtp = smtplib.SMTP(host="smtp.gmail.com", port=587)
+    smtp.starttls()
+    smtp.login(email, pas)
+
+    # counter for user display
+    counter = 0
+
+    # list for maintaining record in databse
+    mailList = []
+
+    for x in data:
+        eob.configure(text=f"{counter}/{len(data)}")
+        controller.update()
+        counter += 1
+
+        # loaction of pdf file for current row
+        pdfLocation = (
+            fnf["projectCertificates"] + f"/{data['CERTIFICATE_CREATED'] or ''}"
+        )
+        if os.path.isfile(pdfLocation) and data.get("MAIL_SENT", "").lower() not in [
+            "y",
+            "yes",
+            "1",
+        ]:
+            # send individual emails
+            s = createAndSend(email, x["EMAIL_ID"], pdfLocation, message, smtp, subject)
+            if not s:
+                # email failed
+                mailList.append("failed")
+            else:
+                # sucessful email
+                mailList.append("yes")
+        else:
+            # email already sent
+            mailList.append("yes")
+
+    # update database
+    for x in range(len(mailList)):
+        row = x + 2
+        ws[f"C{row}"] = mailList[x]
+
+    wb.save(fnf["projectDatabase"])
+
+    # closing smtp serever
+    smtp.quit()
+
+    thisButton.configure(text="Email Certificates")
+    thisButton.configure(bg="#00ff11")
+    thisButton.configure(state="normal")
+
+    eob.configure(text=f"Done({len(data)})!")
+
+    controller.update()
 
 
 def project_settings(controller):
@@ -981,6 +1073,9 @@ if __name__ == "__main__":
 
     # current location of records.xlsx file
     fnf["baseDatabase"] = fnf["current"] + "\\Records.xlsx"
+
+    # Email credentials file
+    fnf["mailCreds"] = fnf["current"] + "\\creds.txt"
 
     # starting the app
     app = MainApp()
