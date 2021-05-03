@@ -515,6 +515,7 @@ def email(thisButton, controller):
     thisButton.configure(background="SystemButtonFace")
     thisButton.configure(text="Email Certificates")
 
+    # certificate folder doesnot exist
     if not os.path.exists(fnf["projectCertificates"]):
         messagebox.showinfo(
             "No Data", "Please create the certificates first in order to Email them."
@@ -527,9 +528,9 @@ def email(thisButton, controller):
 
     # sender email
     email = credFile[0]
-    email = re.findall(r"^[E,e]?[M,m]?[A,a]?[I,i]?[L,l]? *[-,:]* *(.*) *", email)[
-        0
-    ].strip()
+    email = re.findall(
+        r"^[E,e]?[M,m]?[A,a]?[I,i]?[L,l]? *[-,:]* *(.*) *", email
+    )[0].strip()
 
     # sender password
     pas = credFile[1]
@@ -1063,7 +1064,7 @@ if __name__ == "__main__":
     fnf = {}
 
     # current location of software
-    fnf["current"] = os.getcwd()
+    fnf["current"] = str(Path(__file__).parent.absolute())
 
     # current location of projects folder
     fnf["projects"] = fnf["current"] + "\\projects"
