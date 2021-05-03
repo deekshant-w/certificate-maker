@@ -40,6 +40,7 @@ tick = "\u2713"
 # charecters for random name generation
 chars = ascii_uppercase + digits
 
+
 def makeNewName(size=6):
     """
     Generates random names
@@ -51,6 +52,7 @@ def makeNewName(size=6):
         + str(int(time()) % (10 ** size))
     )
     return res
+
 
 def create_project(controller, filename):
     """
@@ -254,9 +256,12 @@ def createData(data):
         cleanData.append(temp)
     return cleanData
 
+
 MAX_RETRIES = 3
 from pathlib import Path
-def makeCerti(filename,retry=MAX_RETRIES):
+
+
+def makeCerti(filename, retry=MAX_RETRIES):
     if not retry:
         return 0
     wordCerti = os.fspath(Path(fnf["projectCertificates"] + f"/{filename}.docx"))
@@ -272,8 +277,8 @@ def makeCerti(filename,retry=MAX_RETRIES):
         print(e.args)
         print(e.excepinfo)
         print(e.hresult)
-        sleep(1/(1+MAX_RETRIES-retry))
-        makeCerti(filename,retry-1)
+        sleep(1 / (1 + MAX_RETRIES - retry))
+        makeCerti(filename, retry - 1)
 
 
 def create(thisButton, controller):
@@ -286,19 +291,19 @@ def create(thisButton, controller):
     thisButton.configure(background="SystemButtonFace")
     thisButton.configure(text="Create Certificates")
     thisButton.configure(state="normal")
-    
+
     if not os.path.isfile(fnf["projectDatabase"]):
         createDB()
-    
+
     wb = oxl.load_workbook(fnf["projectDatabase"])
     ws = wb.active
-    
+
     data = getData(ws)
     cleanData = createData(data)
-    
+
     # if sheet has any data except headers
     if cleanData:
-        # if certificates folder exists then 
+        # if certificates folder exists then
         # there might be some ceertificates in it
         if os.path.exists(fnf["projectCertificates"]):
             inp = messagebox.askyesno(
@@ -318,7 +323,7 @@ def create(thisButton, controller):
                     pass
             else:
                 return
-        
+
         # create certificates folder
         os.makedirs(fnf["projectCertificates"], exist_ok=True)
 
@@ -328,10 +333,10 @@ def create(thisButton, controller):
 
         # update waiting label
         # aob.configure(text="6 sec")
-        
+
         # manually update GUI
         controller.update()
-        
+
         # word handle to convert word -> pdf on windows
         # shared across all functions and all calls
         global wordHandle
@@ -344,7 +349,7 @@ def create(thisButton, controller):
 
         # hide word instance, work in background
         wordHandle.Visible = False
-        
+
         # counter for number of entries in database
         counter = 0
 
@@ -358,8 +363,8 @@ def create(thisButton, controller):
 
             # getting CERTIFICATE_CREATED for that row
             # dont create if already created
-            filename = entry.get("CERTIFICATE_CREATED","")
-            if(filename.lower() not in ['no','0','-',""]):
+            filename = entry.get("CERTIFICATE_CREATED", "")
+            if filename.lower() not in ["no", "0", "-", ""]:
                 fileList.append(filename)
                 continue
 
@@ -372,11 +377,11 @@ def create(thisButton, controller):
             document = DocxTemplate(fnf["projectTemplate"])
             document.render(entry)
             document.save(wordCerti)
-            
+
             # convert to pdf
             if makeCerti(filename):
                 fileList.append(filename)
-            
+
         # exit word handler
         wordHandle.Quit()
 
@@ -387,13 +392,13 @@ def create(thisButton, controller):
         # save new filenames
         for x in range(len(fileList)):
             row = x + 2
-            ws[f'B{row}'] = fileList[x]
+            ws[f"B{row}"] = fileList[x]
         wb.save(fnf["projectDatabase"])
 
         # create records file
         if not os.path.exists(fnf["baseDatabase"]):
             create_records_file()
-        
+
         # load records file
         wb = oxl.load_workbook(fnf["baseDatabase"])
         ws = wb.active
@@ -407,7 +412,7 @@ def create(thisButton, controller):
             ]
         )
         ws.append([" ", " "])
-        
+
         # record certificate data
         emptyLineB4First = 0
         for x in data:
@@ -415,7 +420,7 @@ def create(thisButton, controller):
             if not emptyLineB4First:
                 ws.append([" ", " "])
                 emptyLineB4First = 1
-        
+
         ws.append([" ", " "])
         ws.append(
             ["_", "_", "_", "_", "_", "_", "_",]
@@ -423,13 +428,13 @@ def create(thisButton, controller):
         ws.append([" ", " "])
         ws.append([" ", " "])
         wb.save(fnf["baseDatabase"])
-        
+
         # update GUI
         thisButton.configure(text="Create Certificates")
         thisButton.configure(bg="#00ff11")
         thisButton.configure(state="normal")
         aob.configure(text=f"Done({len(cleanData)})!")
-    
+
     else:
         messagebox.showinfo(
             "No Data", "Please fill the database file to generate certificates."
