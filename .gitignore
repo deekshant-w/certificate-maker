@@ -11,3 +11,4 @@ token.json
 src/temp.py
 ~$*
 src/projects/template/Certificates/*
+**/creds.txt
