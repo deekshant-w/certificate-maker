@@ -545,11 +545,6 @@ def email(thisButton, controller):
         )
 
 
-##########################################################
-#########################################################
-#########################################################
-
-
 def project_settings(controller):
     # open project settings page
     controller.show_frame("projectSettings")

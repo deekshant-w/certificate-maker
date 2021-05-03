@@ -6,3 +6,6 @@ downloads/
 
 *.dk
 .vscode/
+credentials.json
+token.json
+src/temp.py
