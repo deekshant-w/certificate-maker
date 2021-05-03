@@ -494,7 +494,7 @@ def createAndSend(send_from, send_to, certiFile, message, smtp, subject):
         msg["From"] = send_from
         msg["Subject"] = subject
         msg["To"] = send_to
-        
+
         # attatching body
         msg.attach(MIMEText(message))
 
@@ -502,15 +502,14 @@ def createAndSend(send_from, send_to, certiFile, message, smtp, subject):
         part = MIMEBase("application", "octet-stream")
         with open(certiFile, "rb") as file:
             part.set_payload(file.read())
-        
+
         filename = "File.pdf"
         part.add_header(
-            "Content-Disposition",
-            f"attachment; filename= {filename}",
+            "Content-Disposition", f"attachment; filename= {filename}",
         )
         encoders.encode_base64(part)
         msg.attach(part)
-        
+
         # use async or multithreading
         smtp.sendmail(send_from, send_to, msg.as_string())
         return 1
@@ -540,9 +539,9 @@ def email(thisButton, controller):
 
     # sender email
     email = credFile[0]
-    email = re.findall(
-        r"^[E,e]?[M,m]?[A,a]?[I,i]?[L,l]? *[-,:]* *(.*) *", email
-    )[0].strip()
+    email = re.findall(r"^[E,e]?[M,m]?[A,a]?[I,i]?[L,l]? *[-,:]* *(.*) *", email)[
+        0
+    ].strip()
 
     # sender password
     pas = credFile[1]
@@ -603,7 +602,7 @@ def email(thisButton, controller):
         thisButton.configure(text="Email Certificates")
         thisButton.configure(bg="#00ff11")
         thisButton.configure(state="normal")
-        raise(e)
+        raise (e)
         return
 
     # counter for user display
@@ -621,13 +620,13 @@ def email(thisButton, controller):
         pdfLocation = (
             fnf["projectCertificates"] + f"/{x['CERTIFICATE_CREATED'] or 'dk'}.pdf"
         )
-        
+
         # certificate doesnot exist
         if not os.path.isfile(pdfLocation):
             mailList.append("pdf doesnot exist")
-        
+
         # if email is not already sent
-        if x.get("MAIL_SENT", "").lower() not in ["y","yes","1","dont"]:
+        if x.get("MAIL_SENT", "").lower() not in ["y", "yes", "1", "dont"]:
             # send individual emails
             s = createAndSend(email, x["EMAIL_ID"], pdfLocation, message, smtp, subject)
             if not s:
@@ -640,9 +639,8 @@ def email(thisButton, controller):
             # email already sent
             mailList.append("sent")
 
-
     eob.configure(text=f"Saving")
-    
+
     # update database
     for x in range(len(mailList)):
         row = x + 2
@@ -656,7 +654,7 @@ def email(thisButton, controller):
             eob.configure(text=f"Close excel file")
             controller.update()
             sleep(1)
-            
+
     # closing smtp serever
     smtp.quit()
 
