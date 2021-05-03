@@ -10,3 +10,4 @@ credentials.json
 token.json
 src/temp.py
 ~$*
+src/projects/template/Certificates/*
