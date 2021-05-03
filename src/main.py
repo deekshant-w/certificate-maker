@@ -287,10 +287,6 @@ def makeCerti(filename, retry=MAX_RETRIES):
         doc.Close()
         return 1
     except Exception as e:
-        print()
-        print(e.args)
-        print(e.excepinfo)
-        print(e.hresult)
         sleep(1 / (1 + MAX_RETRIES - retry))
         makeCerti(filename, retry - 1)
 
@@ -407,7 +403,14 @@ def create(thisButton, controller):
         for x in range(len(fileList)):
             row = x + 2
             ws[f"B{row}"] = fileList[x]
-        wb.save(fnf["projectDatabase"])
+        while True:
+            try:
+                wb.save(fnf["projectDatabase"])
+                break
+            except:
+                aob.configure(text=f"Close Excel File!")
+                controller.update()
+                sleep(1)
 
         # create records file
         if not os.path.exists(fnf["baseDatabase"]):
@@ -486,19 +489,28 @@ def createAndSend(send_from, send_to, certiFile, message, smtp, subject):
         failure     - 0
     """
     try:
+        # create message
         msg = MIMEMultipart()
         msg["From"] = send_from
         msg["Subject"] = subject
         msg["To"] = send_to
+        
+        # attatching body
         msg.attach(MIMEText(message))
+
+        # attatching pdf
         part = MIMEBase("application", "octet-stream")
         with open(certiFile, "rb") as file:
             part.set_payload(file.read())
-        encoders.encode_base64(part)
+        
+        filename = "File.pdf"
         part.add_header(
-            "Content-Disposition", 'attachment; filename="Offer Letter.pdf"'
+            "Content-Disposition",
+            f"attachment; filename= {filename}",
         )
+        encoders.encode_base64(part)
         msg.attach(part)
+        
         # use async or multithreading
         smtp.sendmail(send_from, send_to, msg.as_string())
         return 1
@@ -585,7 +597,14 @@ def email(thisButton, controller):
     # setting SMTP server
     smtp = smtplib.SMTP(host="smtp.gmail.com", port=587)
     smtp.starttls()
-    smtp.login(email, pas)
+    try:
+        smtp.login(email, pas)
+    except Exception as e:
+        thisButton.configure(text="Email Certificates")
+        thisButton.configure(bg="#00ff11")
+        thisButton.configure(state="normal")
+        raise(e)
+        return
 
     # counter for user display
     counter = 0
@@ -600,13 +619,15 @@ def email(thisButton, controller):
 
         # loaction of pdf file for current row
         pdfLocation = (
-            fnf["projectCertificates"] + f"/{data['CERTIFICATE_CREATED'] or ''}"
+            fnf["projectCertificates"] + f"/{x['CERTIFICATE_CREATED'] or 'dk'}.pdf"
         )
-        if os.path.isfile(pdfLocation) and data.get("MAIL_SENT", "").lower() not in [
-            "y",
-            "yes",
-            "1",
-        ]:
+        
+        # certificate doesnot exist
+        if not os.path.isfile(pdfLocation):
+            mailList.append("pdf doesnot exist")
+        
+        # if email is not already sent
+        if x.get("MAIL_SENT", "").lower() not in ["y","yes","1","dont"]:
             # send individual emails
             s = createAndSend(email, x["EMAIL_ID"], pdfLocation, message, smtp, subject)
             if not s:
@@ -617,15 +638,25 @@ def email(thisButton, controller):
                 mailList.append("yes")
         else:
             # email already sent
-            mailList.append("yes")
+            mailList.append("sent")
 
+
+    eob.configure(text=f"Saving")
+    
     # update database
     for x in range(len(mailList)):
         row = x + 2
         ws[f"C{row}"] = mailList[x]
 
-    wb.save(fnf["projectDatabase"])
-
+    while True:
+        try:
+            wb.save(fnf["projectDatabase"])
+            break
+        except:
+            eob.configure(text=f"Close excel file")
+            controller.update()
+            sleep(1)
+            
     # closing smtp serever
     smtp.quit()
 
